@@ -19,9 +19,15 @@
 *
 */
 
+import type {
+  $Request,
+  $Response,
+  Middleware,
+  NextFunction,
+} from 'express';
+
 import bodyParser from 'body-parser';
 import express from 'express';
-import http from 'http';
 import morgan from 'morgan';
 import OAuthServer from 'node-oauth2-server';
 import { DeviceServer } from 'spark-protocol';
@@ -46,14 +52,14 @@ const  NODE_PORT = process.env.NODE_PORT || 8080;
 global._socket_counter = 1;
 
 //TODO: something better here
-process.on('uncaughtException', (exception) => {
+process.on('uncaughtException', (exception: Error) => {
   let details = '';
   try {
     details = JSON.stringify(exception);
   } catch (stringifyException) {
     logger.error('Caught exception: ' + stringifyException);
   }
-  logger.error('Caught exception: ' + exception + details);
+  logger.error('Caught exception: ${}' + exception.toString() + details);
 });
 
 const app = express();
@@ -69,7 +75,11 @@ const oauth = OAuthServer({
 	model: new OAuth2ServerModel({}),
 });
 
-const setCORSHeaders = (request, response, next) => {
+const setCORSHeaders: Middleware  = (
+  request: $Request,
+  response: $Response,
+  next: NextFunction,
+) => {
   if ('OPTIONS' === request.method) {
     response.set({
       'Access-Control-Allow-Headers': 'X-Requested-With, Content-Type, Accept, Authorization',
@@ -80,7 +90,7 @@ const setCORSHeaders = (request, response, next) => {
     return response.sendStatus(204);
   }
 	else {
-		response.set({'Access-Control-Allow-Origin': '*'});
+		response.set({ 'Access-Control-Allow-Origin': '*' });
 		next();
 	}
 };
@@ -103,11 +113,17 @@ routeConfig(app, [
   new WebhookController(settings.webhookRepository),
 ]);
 
-app.use((request, response, next) => response.sendStatus(404));
+const noRouteMiddleware: Middleware = (
+  request: $Request,
+  response: $Response,
+  next: NextFunction,
+): $Response => response.sendStatus(404);
+
+app.use(noRouteMiddleware);
 
 
 console.log("Starting server, listening on " + NODE_PORT);
-http.createServer(app).listen(NODE_PORT);
+app.listen(NODE_PORT);
 
 const deviceServer = new DeviceServer({
 	coreKeysDir: settings.coreKeysDir,
